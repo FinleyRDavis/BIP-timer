@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BIP Timer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    background:#0b1c2d;
+    color:white;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+    text-align:center;
+    padding:16px;
+}
+h1{font-size:2.1rem;font-weight:800;margin-bottom:6px}
+button{
+    padding:8px 14px;
+    margin:5px;
+    font-size:.95rem;
+    border-radius:6px;
+    border:none;
+    background:#1b3b5f;
+    color:white;
+}
+button:disabled{opacity:.5}
+.work-active{background:#1f7a3f!important}
+.rest-active{background:#8b2d2d!important}
+.stats{
+    display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:16px 0
+}
+.stats div{
+    background:#132b45;padding:10px 12px;border-radius:8px;
+    min-width:95px;max-width:120px;flex:1 1 90px
+}
+ul{list-style:none;padding:0;max-width:320px;margin:10px auto;text-align:left}
+li{background:#132b45;padding:6px 10px;margin-bottom:6px;border-radius:6px;font-size:.9rem}
+.archive{max-width:360px;margin:30px auto 10px;text-align:left}
+.archive-item{
+    background:#0f253d;padding:10px;border-radius:8px;margin-bottom:8px;font-size:.9rem
+}
+</style>
+</head>
+
+<body>
+
+<h1>BIP Timer</h1>
+<h2 id="drill-title">No drill selected</h2>
+<button id="new-drill">New Drill</button>
+
+<div class="stats">
+  <div><p>Total Work</p><h3 id="total-work">0.0 s</h3></div>
+  <div><p>Total Rest</p><h3 id="total-rest">0.0 s</h3></div>
+  <div><p>Work : Rest</p><h3 id="ratio">–</h3></div>
+</div>
+
+<p id="status">Idle</p>
+<h2 id="time">0.00 s</h2>
+
+<button id="start">Start Rep</button>
+<button id="stop" disabled>Stop Rep</button><br>
+<button id="start-rest">Start Rest</button>
+<button id="stop-rest" disabled>Stop Rest</button><br>
+<button id="save-csv">Save to CSV</button>
+
+<h3>Current Drill History</h3>
+<ul id="history"></ul>
+
+<div class="archive">
+  <h3>Previous Drills</h3>
+  <div id="archive"></div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+let drill=null,repCount=0,totalWork=0,totalRest=0;
+let mode=null,startTime=null,interval=null;
+let csvData=[],archiveHTML="";
+
+const qs=id=>document.getElementById(id);
+const startBtn=qs("start"),stopBtn=qs("stop"),
+startRestBtn=qs("start-rest"),stopRestBtn=qs("stop-rest");
+
+function saveState(){
+  localStorage.setItem("bip_state",JSON.stringify({
+    drill,repCount,totalWork,totalRest,
+    history:qs("history").innerHTML,
+    archive:qs("archive").innerHTML,
+    csvData
+  }));
+}
+function loadState(){
+  const s=JSON.parse(localStorage.getItem("bip_state"));
+  if(!s)return;
+  drill=s.drill;repCount=s.repCount;
+  totalWork=s.totalWork;totalRest=s.totalRest;
+  qs("history").innerHTML=s.history;
+  qs("archive").innerHTML=s.archive;
+  csvData=s.csvData||[];
+  if(drill)qs("drill-title").textContent=drill;
+  updateStats();
+}
+window.onbeforeunload=()=>csvData.length>0?"Unsaved session data":null;
+
+function updateTimer(){
+  qs("time").textContent=((Date.now()-startTime)/1000).toFixed(2)+" s";
+}
+function updateStats(){
+  qs("total-work").textContent=totalWork.toFixed(1)+" s";
+  qs("total-rest").textContent=totalRest.toFixed(1)+" s";
+  qs("ratio").textContent=totalRest>0?(totalWork/totalRest).toFixed(2):"–";
+}
+function clearButtons(){
+  startBtn.classList.remove("work-active");
+  stopBtn.classList.remove("work-active");
+  startRestBtn.classList.remove("rest-active");
+  stopRestBtn.classList.remove("rest-active");
+}
+function startTimer(m){
+  if(!drill)return alert("Select a drill first");
+  clearButtons();mode=m;startTime=Date.now();
+  interval=setInterval(updateTimer,50);
+  if(m==="work"){startBtn.classList.add("work-active");stopBtn.classList.add("work-active")}
+  else{startRestBtn.classList.add("rest-active");stopRestBtn.classList.add("rest-active")}
+}
+function stopTimer(){
+  clearInterval(interval);clearButtons();
+  const d=(Date.now()-startTime)/1000;
+  if(mode==="work"){
+    repCount++;totalWork+=d;
+    qs("history").innerHTML+=`<li>Rep ${repCount}: ${d.toFixed(1)} s</li>`;
+    csvData.push({drill,type:"work",rep:repCount,duration:d.toFixed(1)});
+  }else{
+    totalRest+=d;
+    qs("history").innerHTML+=`<li>Rest: ${d.toFixed(1)} s</li>`;
+    csvData.push({drill,type:"rest",rep:"",duration:d.toFixed(1)});
+  }
+  qs("time").textContent=d.toFixed(2)+" s";
+  updateStats();saveState();mode=null;
+}
+
+qs("new-drill").onclick=()=>{
+  if(drill){
+    qs("archive").innerHTML+=`
+    <div class="archive-item"><strong>${drill}</strong>
+    Work ${totalWork.toFixed(1)} s<br>
+    Rest ${totalRest.toFixed(1)} s<br>
+    W:R ${totalRest>0?(totalWork/totalRest).toFixed(2):"–"}
+    </div>`;
+  }
+  drill=prompt("Drill name:");
+  if(!drill)return;
+  repCount=totalWork=totalRest=0;
+  qs("history").innerHTML="";
+  qs("drill-title").textContent=drill;
+  updateStats();saveState();
+};
+
+startBtn.onclick=()=>{startTimer("work");startBtn.disabled=true;stopBtn.disabled=false};
+stopBtn.onclick=()=>{stopTimer();startBtn.disabled=false;stopBtn.disabled=true};
+startRestBtn.onclick=()=>{startTimer("rest");startRestBtn.disabled=true;stopRestBtn.disabled=false};
+stopRestBtn.onclick=()=>{stopTimer();startRestBtn.disabled=false;stopRestBtn.disabled=true};
+
+qs("save-csv").onclick=()=>{
+  let csv="Drill,Type,Rep,Duration_s\n";
+  csvData.forEach(r=>csv+=`${r.drill},${r.type},${r.rep},${r.duration}\n`);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="BIP_timer_data.csv";a.click();
+};
+
+loadState();
+});
+</script>
+
+</body>
+</html>

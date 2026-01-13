@@ -145,7 +145,7 @@ function updateTimer(){
 function updateStats(){
   qs("total-work").textContent=totalWork.toFixed(1)+" s";
   qs("total-rest").textContent=totalRest.toFixed(1)+" s";
-  qs("ratio").textContent=totalRest>0?(totalWork/totalRest).toFixed(2):"–";
+  qs("ratio").textContent=totalRest>0?(totalRest/totalWork).toFixed(2):"–";
 }
 function clearButtons(){
   startBtn.classList.remove("work-active");
@@ -191,7 +191,7 @@ qs("new-drill").onclick=()=>{
         <strong>${drill}</strong><br>
         Work ${totalWork.toFixed(1)} s<br>
         Rest ${totalRest.toFixed(1)} s<br>
-        W:R ${totalRest>0?(totalWork/totalRest).toFixed(2):"–"}
+        W:R ${totalRest>0?(totalRest/totalWork).toFixed(2):"–"}
       </div>`;
   }
   drill=prompt("Drill name:");
